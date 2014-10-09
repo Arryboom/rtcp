@@ -19,11 +19,15 @@ c:host:port表示监听远程指定的端口
 
 import socket
 import sys
+import os
 import threading
 import time
 
 streams = [None, None]  # 存放需要进行数据转发的两个数据流（都是SocketObj对象）
 debug = 1  # 调试状态 0 or 1
+
+# define in socket.h
+SO_BINDTODEVICE = 25
 
 
 def _usage():
@@ -46,7 +50,7 @@ def _get_another_stream(num):
             print("can't connect to the target, quit now!")
             sys.exit(1)
 
-        if streams[num] != None:
+        if streams[num] is not None:
             return streams[num]
         else:
             time.sleep(1)
@@ -89,16 +93,20 @@ def _xstream(num, s1, s2):
     print num, "CLOSED"
 
 
-def _server(port, num):
+def _server(port, num, interface=None):
     '''
     处理服务情况,num为流编号（第0号还是第1号）
     '''
+    bind_ip = '0.0.0.0'
     srv = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    srv.bind(('0.0.0.0', port))
+    if interface:  # 安全性考虑允许选择绑定的网卡
+        srv.setsockopt(socket.SOL_SOCKET, 25, interface)
+    srv.bind((bind_ip, port))
     srv.listen(1)
+    print 'stream[%d] listen [%s:%d] wait .' % (num, bind_ip, port)
     while True:
         conn, addr = srv.accept()
-        print "connected from:", addr
+        print "stream[%d] connected from:%s" % (num, addr)
         streams[num] = conn  # 放入本端流对象
         s2 = _get_another_stream(num)  # 获取另一端流对象
         _xstream(num, conn, s2)
@@ -142,11 +150,19 @@ if __name__ == '__main__':
     for i in [0, 1]:
         s = targv[i]  # stream描述 c:ip:port 或 l:port
         sl = s.split(':')
-        if len(sl) == 2 and (sl[0] == 'l' or sl[0] == 'L'):  # l:port
-            t = threading.Thread(target=_server, args=(int(sl[1]), i))
+        if len(sl) >= 2 and (sl[0] == 'l' or sl[0] == 'L'):  # l:port
+            interface = None
+            if len(sl) == 3:
+                if os.getuid() == 0:
+                    interface = sl[2]
+                else:
+                    print 'WARN: Require root privileges.'
+            t = threading.Thread(target=_server,
+                                 args=(int(sl[1]), i, interface))
             tlist.append(t)
         elif len(sl) == 3 and (sl[0] == 'c' or sl[0] == 'C'):  # c:host:port
-            t = threading.Thread(target=_connect, args=(sl[1], int(sl[2]), i))
+            t = threading.Thread(target=_connect,
+                                 args=(sl[1], int(sl[2]), i))
             tlist.append(t)
         else:
             _usage()
