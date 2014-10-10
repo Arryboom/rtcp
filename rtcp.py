@@ -28,6 +28,7 @@ debug = 1  # 调试状态 0 or 1
 
 # define in socket.h
 SO_BINDTODEVICE = 25
+SO_REUSEADDR = 2
 
 
 def _usage():
@@ -99,8 +100,13 @@ def _server(port, num, interface=None):
     '''
     bind_ip = '0.0.0.0'
     srv = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+
+    # 允许端口重用避免 TIME_WAIT 导致bind 失败
+    srv.setsockopt(socket.SOL_SOCKET, SO_REUSEADDR, 1)
+
     if interface:  # 安全性考虑允许选择绑定的网卡
         srv.setsockopt(socket.SOL_SOCKET, 25, interface)
+
     srv.bind((bind_ip, port))
     srv.listen(1)
     print 'stream[%d] listen [%s:%d] wait .' % (num, bind_ip, port)
@@ -146,6 +152,7 @@ if __name__ == '__main__':
         _usage()
         sys.exit(1)
     tlist = []  # 线程列表，最终存放两个线程对象
+    socket.setdefaulttimeout(600)  # 十分钟超时
     targv = [sys.argv[1], sys.argv[2]]
     for i in [0, 1]:
         s = targv[i]  # stream描述 c:ip:port 或 l:port
