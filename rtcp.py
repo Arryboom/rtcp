@@ -17,6 +17,8 @@ c:host:port表示监听远程指定的端口
 @date: 2009-7
 '''
 
+from __future__ import print_function
+
 import socket
 import sys
 import os
@@ -32,7 +34,7 @@ SO_REUSEADDR = 2
 
 
 def _usage():
-    print 'Usage: ./rtcp.py stream1 stream2\nstream : l:port  or c:host:port'
+    print('Usage: ./rtcp.py stream1 stream2\nstream : l:port  or c:host:port')
 
 
 def _get_another_stream(num):
@@ -67,15 +69,15 @@ def _xstream(num, s1, s2):
             # 注意，recv函数会阻塞，直到对端完全关闭（close后还需要一定时间才能关闭，最快关闭方法是shutdow）
             buff = s1.recv(1024)
             if debug > 0:
-                print num, "recv"
+                print("stream[%d] recv" % num)
             if len(buff) == 0:  # 对端关闭连接，读不到数据
-                print num, "one closed"
+                print("stream[%d] one closed" % num)
                 break
             s2.sendall(buff)
             if debug > 0:
-                print num, "sendall"
+                print("stream[%d] sendall" % num)
     except:
-        print num, "one connect closed."
+        print("stream[%d] one closed by except!" % num)
 
     try:
         s1.shutdown(socket.SHUT_RDWR)
@@ -91,7 +93,8 @@ def _xstream(num, s1, s2):
 
     streams[0] = None
     streams[1] = None
-    print num, "CLOSED"
+    print("stream all closed")
+    return
 
 
 def _server(port, num, interface=None):
@@ -109,10 +112,10 @@ def _server(port, num, interface=None):
 
     srv.bind((bind_ip, port))
     srv.listen(1)
-    print 'stream[%d] listen [%s:%d] wait .' % (num, bind_ip, port)
+    print('stream[%d] listen [%s:%d] wait .' % (num, bind_ip, port))
     while True:
         conn, addr = srv.accept()
-        print "stream[%d] connected from:%s" % (num, addr)
+        print("stream[%d] connected from:%s" % (num, addr))
         streams[num] = conn  # 放入本端流对象
         s2 = _get_another_stream(num)  # 获取另一端流对象
         _xstream(num, conn, s2)
@@ -135,13 +138,13 @@ def _connect(host, port, num):
         conn = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         try:
             conn.connect((host, port))
-        except Exception, e:
+        except Exception:
             print ('can not connect %s:%s!' % (host, port))
             not_connet_time += 1
             time.sleep(wait_time)
             continue
 
-        print "connected to %s:%i" % (host, port)
+        print("connected to %s:%i" % (host, port))
         streams[num] = conn  # 放入本端流对象
         s2 = _get_another_stream(num)  # 获取另一端流对象
         _xstream(num, conn, s2)
@@ -163,7 +166,7 @@ if __name__ == '__main__':
                 if os.getuid() == 0:
                     interface = sl[2]
                 else:
-                    print 'WARN: Require root privileges.'
+                    print('WARN: Require root privileges.')
             t = threading.Thread(target=_server,
                                  args=(int(sl[1]), i, interface))
             tlist.append(t)
